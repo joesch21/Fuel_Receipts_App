@@ -64,27 +64,32 @@ const App = () => {
       return;
     }
 
-    // Ensure valid meter readings
-    const startMeter = parseFloat(storedTruckData[0].startMeter || 0);
-    const endMeter = parseFloat(storedTruckData[0].endMeter || 0);
+    const truck = storedTruckData[0];
+
+    const startMeter = parseFloat(truck.startMeter || 0);
+    const endMeter = parseFloat(truck.endMeter || 0);
+    const startDip = parseFloat(truck.startDip || 0);
+    const endDip = parseFloat(truck.endDip || 0);
 
     if (endMeter <= startMeter) {
       alert("End meter reading must be greater than start meter reading.");
       return;
     }
 
-    // Calculate Meter Fuel Used
+    // Calculate Meter Fuel Used and Dip Change
     const meterFuelUsed = endMeter - startMeter;
+    const dipChange = endDip - startDip;
 
     // Calculate Total Bulk Fuel Added
     const totalBulkFills = storedFills.reduce((sum, fill) => sum + parseFloat(fill.amount || 0), 0);
 
     // Calculate Discrepancy
-    const discrepancy = meterFuelUsed - totalBulkFills;
+    const discrepancy = meterFuelUsed + dipChange - totalBulkFills;
 
     // Update State with Results
     setDiscrepancy({
       meterFuelUsed,
+      dipChange,
       totalBulkFills,
       discrepancy,
       loss: discrepancy > 0, // True if there’s a loss
@@ -176,6 +181,7 @@ const App = () => {
       {discrepancy && (
         <div>
           <p><strong>Meter Fuel Used:</strong> {discrepancy.meterFuelUsed} L</p>
+          <p><strong>Dip Change:</strong> {discrepancy.dipChange} L</p>
           <p><strong>Total Bulk Fills:</strong> {discrepancy.totalBulkFills} L</p>
           <p>
             <strong>Discrepancy:</strong> {Math.abs(discrepancy.discrepancy)} L 
