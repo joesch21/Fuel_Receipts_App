@@ -1,11 +1,4 @@
-import React, { useState, useEffect } from "react";
-import {
-  fetchTruckData,
-  saveTruckData,
-  fetchFillData,
-  saveFillData,
-  clearAllData,
-} from "./dbHelper";
+import React, { useState } from "react";
 import "./App.css";
 
 const App = () => {
@@ -17,92 +10,87 @@ const App = () => {
     endDip: "",
   });
 
-  const [bulkFill, setBulkFill] = useState({
+  const [bulkFills, setBulkFills] = useState([]);
+  const [currentFill, setCurrentFill] = useState({
     time: "",
     amount: "",
   });
 
-  const [storedTruckData, setStoredTruckData] = useState([]);
-  const [storedFills, setStoredFills] = useState([]);
   const [discrepancy, setDiscrepancy] = useState(null);
 
-  // Load stored truck and fill data
-  const loadTruckData = async () => {
-    const data = await fetchTruckData();
-    setStoredTruckData(data);
+  // Save Start Data
+  const handleSaveStartData = () => {
+    if (!truckData.truckId || !truckData.startMeter || !truckData.startDip) {
+      alert("Please fill out all fields for the start of day.");
+      return;
+    }
+    alert("Start data saved successfully!");
   };
 
-  const loadFills = async () => {
-    const data = await fetchFillData();
-    setStoredFills(data);
-  };
-
-  useEffect(() => {
-    loadTruckData();
-    loadFills();
-  }, []);
-
-  // Save truck data
-  const handleSaveTruckData = async (type) => {
-    const truckDataToSave = { ...truckData, type };
-    await saveTruckData(truckDataToSave);
-    setTruckData({ truckId: "", startMeter: "", startDip: "", endMeter: "", endDip: "" });
-    loadTruckData();
-  };
-
-  // Save bulk fill data
-  const handleSaveBulkFill = async () => {
-    await saveFillData(bulkFill);
-    setBulkFill({ time: "", amount: "" });
-    loadFills();
-  };
-
-  // Calculate discrepancy
-  const calculateDiscrepancy = () => {
-    if (storedTruckData.length === 0 || storedFills.length === 0) {
-      alert("No sufficient data to calculate discrepancy.");
+  // Save End Data
+  const handleSaveEndData = () => {
+    if (!truckData.endMeter || !truckData.endDip) {
+      alert("Please fill out all fields for the end of day.");
       return;
     }
 
-    const truck = storedTruckData[0];
-
-    const startMeter = parseFloat(truck.startMeter || 0);
-    const endMeter = parseFloat(truck.endMeter || 0);
-    const startDip = parseFloat(truck.startDip || 0);
-    const endDip = parseFloat(truck.endDip || 0);
-
-    if (endMeter <= startMeter) {
+    if (parseFloat(truckData.endMeter) <= parseFloat(truckData.startMeter)) {
       alert("End meter reading must be greater than start meter reading.");
       return;
     }
 
-    // Calculate Meter Fuel Used and Dip Change
-    const meterFuelUsed = endMeter - startMeter;
-    const dipChange = endDip - startDip;
+    alert("End data saved successfully!");
+  };
 
-    // Calculate Total Bulk Fuel Added
-    const totalBulkFills = storedFills.reduce((sum, fill) => sum + parseFloat(fill.amount || 0), 0);
+  // Save Bulk Fill
+  const handleSaveBulkFill = () => {
+    if (!currentFill.time || !currentFill.amount) {
+      alert("Please fill out all fields for the bulk fill.");
+      return;
+    }
 
-    // Calculate Discrepancy
-    const discrepancy = meterFuelUsed + dipChange - totalBulkFills;
+    setBulkFills([...bulkFills, currentFill]);
+    setCurrentFill({ time: "", amount: "" });
+    alert("Bulk fill saved successfully!");
+  };
 
-    // Update State with Results
+  // Calculate Discrepancy
+  const calculateDiscrepancy = () => {
+    if (!truckData.startMeter || !truckData.endMeter || bulkFills.length === 0) {
+      alert("Please ensure all data is entered before calculating discrepancy.");
+      return;
+    }
+
+    const meterFuelUsed =
+      parseFloat(truckData.endMeter) - parseFloat(truckData.startMeter);
+    const totalBulkFills = bulkFills.reduce(
+      (sum, fill) => sum + parseFloat(fill.amount || 0),
+      0
+    );
+
+    const discrepancyValue = meterFuelUsed - totalBulkFills;
     setDiscrepancy({
       meterFuelUsed,
-      dipChange,
       totalBulkFills,
-      discrepancy,
-      loss: discrepancy > 0, // True if there’s a loss
+      discrepancy: discrepancyValue,
+      status: discrepancyValue > 0 ? "Loss" : "Surplus",
     });
   };
 
-  // Reset all data
-  const handleResetData = async () => {
-    if (window.confirm("This will delete all data. Are you sure?")) {
-      await clearAllData();
-      setStoredTruckData([]);
-      setStoredFills([]);
+  // Reset All Data
+  const handleResetData = () => {
+    if (window.confirm("This will reset all data. Are you sure?")) {
+      setTruckData({
+        truckId: "",
+        startMeter: "",
+        startDip: "",
+        endMeter: "",
+        endDip: "",
+      });
+      setBulkFills([]);
       setDiscrepancy(null);
+      setCurrentFill({ time: "", amount: "" });
+      alert("All data has been reset!");
     }
   };
 
@@ -110,6 +98,7 @@ const App = () => {
     <div className="App">
       <h1>Fuel Receipts App</h1>
 
+      {/* Start of Day Section */}
       <h2>Start of Day</h2>
       <label>
         Truck ID:
@@ -135,27 +124,31 @@ const App = () => {
           onChange={(e) => setTruckData({ ...truckData, startDip: e.target.value })}
         />
       </label>
-      <button onClick={() => handleSaveTruckData("start")}>Save Start Data</button>
+      <button onClick={handleSaveStartData}>Save Start Data</button>
 
+      {/* Bulk Fill Section */}
       <h2>Bulk Fill</h2>
       <label>
         Time:
         <input
           type="time"
-          value={bulkFill.time}
-          onChange={(e) => setBulkFill({ ...bulkFill, time: e.target.value })}
+          value={currentFill.time}
+          onChange={(e) => setCurrentFill({ ...currentFill, time: e.target.value })}
         />
       </label>
       <label>
         Amount (L):
         <input
           type="number"
-          value={bulkFill.amount}
-          onChange={(e) => setBulkFill({ ...bulkFill, amount: e.target.value })}
+          value={currentFill.amount}
+          onChange={(e) =>
+            setCurrentFill({ ...currentFill, amount: e.target.value })
+          }
         />
       </label>
       <button onClick={handleSaveBulkFill}>Save Bulk Fill</button>
 
+      {/* End of Day Section */}
       <h2>End of Day</h2>
       <label>
         End Meter:
@@ -173,44 +166,47 @@ const App = () => {
           onChange={(e) => setTruckData({ ...truckData, endDip: e.target.value })}
         />
       </label>
-      <button onClick={() => handleSaveTruckData("end")}>Save End Data</button>
+      <button onClick={handleSaveEndData}>Save End Data</button>
 
+      {/* Discrepancy Results */}
       <h2>Discrepancy Results</h2>
       <button onClick={calculateDiscrepancy}>Calculate</button>
 
       {discrepancy && (
         <div>
-          <p><strong>Meter Fuel Used:</strong> {discrepancy.meterFuelUsed} L</p>
-          <p><strong>Dip Change:</strong> {discrepancy.dipChange} L</p>
-          <p><strong>Total Bulk Fills:</strong> {discrepancy.totalBulkFills} L</p>
           <p>
-            <strong>Discrepancy:</strong> {Math.abs(discrepancy.discrepancy)} L 
-            ({discrepancy.loss ? "Loss" : "Surplus"})
+            <strong>Meter Fuel Used:</strong> {discrepancy.meterFuelUsed} L
+          </p>
+          <p>
+            <strong>Total Bulk Fills:</strong> {discrepancy.totalBulkFills} L
+          </p>
+          <p>
+            <strong>Discrepancy:</strong> {Math.abs(discrepancy.discrepancy)} L (
+            {discrepancy.status})
           </p>
         </div>
       )}
 
+      {/* Stored Data */}
       <h2>Stored Data</h2>
       <h3>Truck Data</h3>
-      {storedTruckData.length > 0 ? (
-        <p>
-          Truck ID: {storedTruckData[0].truckId}, Start Meter: {storedTruckData[0].startMeter}, End
-          Meter: {storedTruckData[0].endMeter}, Start Dip: {storedTruckData[0].startDip}, End Dip:{" "}
-          {storedTruckData[0].endDip}
-        </p>
-      ) : (
-        <p>No truck data available.</p>
-      )}
+      <p>
+        Truck ID: {truckData.truckId || "N/A"}, Start Meter:{" "}
+        {truckData.startMeter || "N/A"}, End Meter:{" "}
+        {truckData.endMeter || "N/A"}, Start Dip:{" "}
+        {truckData.startDip || "N/A"}, End Dip: {truckData.endDip || "N/A"}
+      </p>
 
       <h3>Bulk Fills</h3>
       <ul>
-        {storedFills.map((fill, idx) => (
+        {bulkFills.map((fill, idx) => (
           <li key={idx}>
             Time: {fill.time}, Amount: {fill.amount} L
           </li>
         ))}
       </ul>
 
+      {/* Reset Button */}
       <button className="reset-button" onClick={handleResetData}>
         Reset Data
       </button>
