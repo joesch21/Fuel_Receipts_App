@@ -93,7 +93,6 @@ const App = () => {
       calculatedFuelUsed,
       totalBulkFills,
       discrepancy: discrepancyValue,
-      status: discrepancyValue > 0 ? "Loss" : "Surplus",
     });
   };
 
@@ -220,8 +219,7 @@ const App = () => {
             <strong>Total Bulk Fills:</strong> {discrepancy.totalBulkFills} L
           </p>
           <p>
-            <strong>Discrepancy:</strong> {Math.abs(discrepancy.discrepancy)} L (
-            {discrepancy.status})
+            <strong>Discrepancy:</strong> {Math.abs(discrepancy.discrepancy)} L
           </p>
         </div>
       )}
