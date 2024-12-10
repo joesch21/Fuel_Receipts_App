@@ -56,21 +56,41 @@ const App = () => {
 
   // Calculate Discrepancy
   const calculateDiscrepancy = () => {
-    if (!truckData.startMeter || !truckData.endMeter || bulkFills.length === 0) {
+    if (
+      !truckData.startMeter ||
+      !truckData.endMeter ||
+      !truckData.startDip ||
+      !truckData.endDip ||
+      bulkFills.length === 0
+    ) {
       alert("Please ensure all data is entered before calculating discrepancy.");
       return;
     }
 
+    // Meter Fuel Used
     const meterFuelUsed =
       parseFloat(truckData.endMeter) - parseFloat(truckData.startMeter);
+
+    // Dip Difference
+    const dipDifference =
+      parseFloat(truckData.startDip) - parseFloat(truckData.endDip);
+
+    // Calculated Fuel Used
+    const calculatedFuelUsed = meterFuelUsed + dipDifference;
+
+    // Total Bulk Fills
     const totalBulkFills = bulkFills.reduce(
       (sum, fill) => sum + parseFloat(fill.amount || 0),
       0
     );
 
-    const discrepancyValue = meterFuelUsed - totalBulkFills;
+    // Discrepancy
+    const discrepancyValue = calculatedFuelUsed - totalBulkFills;
+
     setDiscrepancy({
       meterFuelUsed,
+      dipDifference,
+      calculatedFuelUsed,
       totalBulkFills,
       discrepancy: discrepancyValue,
       status: discrepancyValue > 0 ? "Loss" : "Surplus",
@@ -105,7 +125,9 @@ const App = () => {
         <input
           type="text"
           value={truckData.truckId}
-          onChange={(e) => setTruckData({ ...truckData, truckId: e.target.value })}
+          onChange={(e) =>
+            setTruckData({ ...truckData, truckId: e.target.value })
+          }
         />
       </label>
       <label>
@@ -113,7 +135,9 @@ const App = () => {
         <input
           type="number"
           value={truckData.startMeter}
-          onChange={(e) => setTruckData({ ...truckData, startMeter: e.target.value })}
+          onChange={(e) =>
+            setTruckData({ ...truckData, startMeter: e.target.value })
+          }
         />
       </label>
       <label>
@@ -121,7 +145,9 @@ const App = () => {
         <input
           type="number"
           value={truckData.startDip}
-          onChange={(e) => setTruckData({ ...truckData, startDip: e.target.value })}
+          onChange={(e) =>
+            setTruckData({ ...truckData, startDip: e.target.value })
+          }
         />
       </label>
       <button onClick={handleSaveStartData}>Save Start Data</button>
@@ -133,7 +159,9 @@ const App = () => {
         <input
           type="time"
           value={currentFill.time}
-          onChange={(e) => setCurrentFill({ ...currentFill, time: e.target.value })}
+          onChange={(e) =>
+            setCurrentFill({ ...currentFill, time: e.target.value })
+          }
         />
       </label>
       <label>
@@ -155,7 +183,9 @@ const App = () => {
         <input
           type="number"
           value={truckData.endMeter}
-          onChange={(e) => setTruckData({ ...truckData, endMeter: e.target.value })}
+          onChange={(e) =>
+            setTruckData({ ...truckData, endMeter: e.target.value })
+          }
         />
       </label>
       <label>
@@ -163,7 +193,9 @@ const App = () => {
         <input
           type="number"
           value={truckData.endDip}
-          onChange={(e) => setTruckData({ ...truckData, endDip: e.target.value })}
+          onChange={(e) =>
+            setTruckData({ ...truckData, endDip: e.target.value })
+          }
         />
       </label>
       <button onClick={handleSaveEndData}>Save End Data</button>
@@ -176,6 +208,13 @@ const App = () => {
         <div>
           <p>
             <strong>Meter Fuel Used:</strong> {discrepancy.meterFuelUsed} L
+          </p>
+          <p>
+            <strong>Dip Difference:</strong> {discrepancy.dipDifference} L
+          </p>
+          <p>
+            <strong>Calculated Fuel Used:</strong>{" "}
+            {discrepancy.calculatedFuelUsed} L
           </p>
           <p>
             <strong>Total Bulk Fills:</strong> {discrepancy.totalBulkFills} L
