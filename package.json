@@ -6,7 +6,7 @@
     "dexie": "^4.0.10",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-scripts": "5.0.1",
+    "react-scripts": "^5.0.1",
     "tesseract.js": "^4.1.1",
     "web-vitals": "^2.1.4"
   },
@@ -16,7 +16,6 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "postinstall": "echo 'Postinstall completed'"
-
   },
   "eslintConfig": {
     "extends": [
