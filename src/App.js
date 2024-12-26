@@ -18,7 +18,20 @@ const App = () => {
 
   const [discrepancy, setDiscrepancy] = useState(null);
 
-  // Save all data to a single JSON file
+  // Save all data to localStorage in the background
+  const saveToLocalStorage = (section) => {
+    const dataToSave = {
+      truckData,
+      bulkFills,
+      discrepancy,
+    };
+
+    localStorage.setItem("fuelReceiptsData", JSON.stringify(dataToSave));
+    console.log(`${section} data saved to localStorage`);
+    alert(`${section} data saved!`);
+  };
+
+  // Optional: Save all data to a file explicitly
   const saveToFile = (section) => {
     const dataToSave = {
       truckData,
@@ -37,7 +50,7 @@ const App = () => {
     alert(`${section} data saved to file!`);
   };
 
-  // Load data from a file
+  // Load data from a file or localStorage
   const loadFromFile = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -46,7 +59,6 @@ const App = () => {
         try {
           const loadedData = JSON.parse(e.target.result);
 
-          // Merge loaded data with existing state
           setTruckData((prev) => ({
             ...prev,
             ...loadedData.truckData,
@@ -60,6 +72,16 @@ const App = () => {
         }
       };
       reader.readAsText(file);
+    } else {
+      // Load data from localStorage as fallback
+      const savedData = localStorage.getItem("fuelReceiptsData");
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        setTruckData(parsedData.truckData || {});
+        setBulkFills(parsedData.bulkFills || []);
+        setDiscrepancy(parsedData.discrepancy || null);
+        alert("Data loaded from localStorage!");
+      }
     }
   };
 
@@ -72,6 +94,7 @@ const App = () => {
 
     setBulkFills((prev) => [...prev, currentFill]);
     setCurrentFill({ time: "", amount: "" });
+    saveToLocalStorage("Bulk Fills");
     alert("Bulk fill saved successfully!");
   };
 
@@ -105,6 +128,8 @@ const App = () => {
       totalBulkFills,
       discrepancy: discrepancyValue,
     });
+
+    saveToLocalStorage("Discrepancy");
     alert("Discrepancy calculated!");
   };
 
@@ -121,6 +146,7 @@ const App = () => {
       setBulkFills([]);
       setDiscrepancy(null);
       setCurrentFill({ time: "", amount: "" });
+      localStorage.removeItem("fuelReceiptsData");
       alert("All data has been reset!");
     }
   };
@@ -161,7 +187,7 @@ const App = () => {
           }
         />
       </label>
-      <button onClick={() => saveToFile("Start of Day")}>
+      <button onClick={() => saveToLocalStorage("Start of Day")}>
         Save Start of Day
       </button>
 
@@ -188,7 +214,6 @@ const App = () => {
         />
       </label>
       <button onClick={handleSaveBulkFill}>Add Bulk Fill</button>
-      <button onClick={() => saveToFile("Bulk Fill")}>Save Bulk Fills</button>
 
       <h3>Saved Bulk Fills</h3>
       <ul>
@@ -221,7 +246,9 @@ const App = () => {
           }
         />
       </label>
-      <button onClick={() => saveToFile("End of Day")}>Save End of Day</button>
+      <button onClick={() => saveToLocalStorage("End of Day")}>
+        Save End of Day
+      </button>
 
       {/* Discrepancy Results */}
       <button onClick={calculateDiscrepancy}>Calculate Discrepancy</button>
@@ -248,7 +275,7 @@ const App = () => {
 
       {/* File Management Buttons */}
       <div>
-        <button onClick={saveToFile}>Save All Data</button>
+        <button onClick={saveToFile}>Download JSON File</button>
         <input
           type="file"
           accept=".json"
