@@ -33,44 +33,135 @@ const App = () => {
         localStorage.setItem("fuelReceiptsData", JSON.stringify(dataToSave));
     }, [truckData, bulkFills, discrepancy]);
 
-    // Download data 
+    // Download data as a text file
     const downloadData = () => {
-        const dataToSave = { truckData, bulkFills, discrepancy };
-        const fileData = new Blob([JSON.stringify(dataToSave, null, 2)], {
-            type: "application/json",
-        });
+        const dataToSave = `
+Truck Data:
+  Truck ID: ${truckData.truckId}
+  Start Meter: ${truckData.startMeter}
+  Start Dip: ${truckData.startDip}
+  End Meter: ${truckData.endMeter}
+  End Dip: ${truckData.endDip}
+
+Bulk Fills:
+${bulkFills.map(fill => `  Time: ${fill.time}, Amount: ${fill.amount} L`).join('\n')}
+
+Discrepancy:
+  ${discrepancy ? 
+    `Meter Fuel Used: ${discrepancy.meterFuelUsed} L
+     Dip Difference: ${discrepancy.dipDifference} L
+     Calculated Fuel Used: ${discrepancy.calculatedFuelUsed} L
+     Total Bulk Fills: ${discrepancy.totalBulkFills} L
+     Discrepancy: ${Math.abs(discrepancy.discrepancy)} L`
+    : 'Not calculated'}
+`;
+
+        const fileData = new Blob([dataToSave], { type: "text/plain" });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(fileData);
 
-        // Get current date and time for filename
         const now = new Date();
-        const formattedDate = now.toLocaleDateString().replace(/\//g, '-'); 
-        const formattedTime = now.toLocaleTimeString().replace(/:/g, '-'); 
-        const filename = `fuel_receipts_data_${formattedDate}_${formattedTime}.json`;
+        const formattedDate = now.toLocaleDateString().replace(/\//g, '-');
+        const formattedTime = now.toLocaleTimeString().replace(/:/g, '-');
+        const filename = `fuel_receipts_data_${formattedDate}_${formattedTime}.txt`;
 
         link.download = filename;
         link.click();
     };
 
-    // Load data from a file
+    // Load data from a text file and display on a card
     const loadData = (event) => {
-        if (event.target.files && event.target.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const loadedData = JSON.parse(e.target.result);
-                    setTruckData(loadedData.truckData);
-                    setBulkFills(loadedData.bulkFills || []);
-                    setDiscrepancy(loadedData.discrepancy || null);
-                    alert("Data loaded successfully!");
-                } catch (error) {
-                    alert("Error loading the data. Please ensure the file is valid.");
-                    console.error("Error parsing file data:", error);
-                }
-            };
-            reader.readAsText(event.target.files[0]);
-        }
-    };
+      if (event.target.files && event.target.files[0]) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+              try {
+                  const fileContent = e.target.result;
+  
+                  // --- Custom Parsing Logic ---
+  
+                  const lines = fileContent.split('\n');
+                  const truckData = {};
+                  const bulkFills = [];
+                  let discrepancy = null;
+  
+                  let currentSection = "";
+  
+                  for (const line of lines) {
+                      if (line.startsWith("Truck Data:")) {
+                          currentSection = "truckData";
+                      } else if (line.startsWith("Bulk Fills:")) {
+                          currentSection = "bulkFills";
+                      } else if (line.startsWith("Discrepancy:")) {
+                          currentSection = "discrepancy";
+                      } else if (line.trim() !== "" && currentSection) {
+                          const parts = line.trim().split(':');
+                          if (parts.length === 2) {
+                              const key = parts[0].trim().toLowerCase().replace(' ', '_');
+                              const value = parts[1].trim();
+  
+                              if (currentSection === "truckData") {
+                                  truckData[key] = value;
+                              } else if (currentSection === "bulkFills") {
+                                  const fillParts = value.split(',');
+                                  if (fillParts.length === 2) {
+                                      const time = fillParts[0].trim().split(' ')[1];
+                                      const amount = fillParts[1].trim().split(' ')[0];
+                                      bulkFills.push({ time, amount });
+                                  }
+                              } else if (currentSection === "discrepancy" && value !== 'Not calculated') {
+                                  const discrepancyParts = value.split(' ');
+                                  const meterFuelUsed = parseFloat(discrepancyParts[3]);
+                                  const dipDifference = parseFloat(discrepancyParts[6]);
+                                  const calculatedFuelUsed = parseFloat(discrepancyParts[9]);
+                                  const totalBulkFills = parseFloat(discrepancyParts[12]);
+                                  const discrepancyValue = parseFloat(discrepancyParts[15]); // Corrected index
+                                  discrepancy = {
+                                      meterFuelUsed,
+                                      dipDifference,
+                                      calculatedFuelUsed,
+                                      totalBulkFills,
+                                      discrepancy: discrepancyValue,
+                                  };
+                              }
+                          }
+                      }
+                  }
+  
+                  // --- Display data on a card ---
+  
+                  // Construct the card content here
+                  const cardContent = `
+                      Truck Data:
+                        Truck ID: ${truckData.truckId}
+                        Start Meter: ${truckData.startMeter}
+                        Start Dip: ${truckData.startDip}
+                        End Meter: ${truckData.endMeter}
+                        End Dip: ${truckData.endDip}
+  
+                      Bulk Fills:
+                      ${bulkFills.map(fill => `  Time: ${fill.time}, Amount: ${fill.amount} L`).join('\n')}
+  
+                      Discrepancy:
+                        ${discrepancy ?
+                          `Meter Fuel Used: ${discrepancy.meterFuelUsed} L
+                           Dip Difference: ${discrepancy.dipDifference} L
+                           Calculated Fuel Used: ${discrepancy.calculatedFuelUsed} L
+                           Total Bulk Fills: ${discrepancy.totalBulkFills} L
+                           Discrepancy: ${Math.abs(discrepancy.discrepancy)} L`
+                          : 'Not calculated'}
+                  `;
+  
+                  // Now you can use cardContent in your alert or card component
+                  alert(cardContent);
+  
+              } catch (error) {
+                  alert("Error loading the data. Please ensure the file is valid.");
+                  console.error("Error parsing file data:", error);
+              }
+          };
+          reader.readAsText(event.target.files[0]);
+      }
+  };
 
     // --- Calculations ---
 
@@ -218,7 +309,7 @@ const App = () => {
             {/* File Management Buttons */}
             <div>
                 <button onClick={downloadData}>Download Data</button>
-                <input type="file" accept=".json" onChange={loadData} style={{ marginTop: "10px" }} />
+                <input type="file" accept=".txt" onChange={loadData} style={{ marginTop: "10px" }} />
             </div>
 
             {/* Reset Button */}
