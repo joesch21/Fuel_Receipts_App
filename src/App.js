@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import "./App.css";
 
 const App = () => {
@@ -18,55 +18,13 @@ const App = () => {
 
   const [discrepancy, setDiscrepancy] = useState(null);
 
-  // Save data to localStorage
-  const saveToLocalStorage = (data) => {
-    localStorage.setItem("fuelReceiptsData", JSON.stringify(data));
-    alert("Data saved to local storage!");
-  };
-
-  // Auto-load data from localStorage when the app starts
-  useEffect(() => {
-    const savedData = localStorage.getItem("fuelReceiptsData");
-    if (savedData) {
-      try {
-        const parsedData = JSON.parse(savedData);
-
-        // Validate the structure of the saved data before loading
-        if (validateDataStructure(parsedData)) {
-          setTruckData(parsedData.truckData || {});
-          setBulkFills(parsedData.bulkFills || []);
-          setDiscrepancy(parsedData.discrepancy || null);
-          alert("Data loaded from local storage!");
-        } else {
-          console.warn("Invalid data structure in local storage. Ignoring.");
-        }
-      } catch (error) {
-        console.error("Error parsing local storage data:", error);
-      }
-    }
-  }, []);
-
-  // Validate the structure of the loaded file or local storage data
-  const validateDataStructure = (data) => {
-    if (
-      typeof data === "object" &&
-      data.truckData &&
-      Array.isArray(data.bulkFills)
-    ) {
-      return true;
-    }
-    return false;
-  };
-
-  // Save data to a local file
-  const saveToFile = () => {
+  // Save all data to a single JSON file
+  const saveToFile = (section) => {
     const dataToSave = {
       truckData,
       bulkFills,
       discrepancy,
     };
-
-    saveToLocalStorage(dataToSave); // Save to localStorage
 
     const fileData = new Blob([JSON.stringify(dataToSave, null, 2)], {
       type: "application/json",
@@ -76,7 +34,7 @@ const App = () => {
     link.href = URL.createObjectURL(fileData);
     link.download = "fuel_receipts_data.json";
     link.click();
-    alert("Data saved to a local file!");
+    alert(`${section} data saved to file!`);
   };
 
   // Load data from a file
@@ -88,17 +46,14 @@ const App = () => {
         try {
           const loadedData = JSON.parse(e.target.result);
 
-          // Validate the structure of the loaded file before updating state
-          if (validateDataStructure(loadedData)) {
-            setTruckData(loadedData.truckData || {});
-            setBulkFills(loadedData.bulkFills || []);
-            setDiscrepancy(loadedData.discrepancy || null);
-
-            saveToLocalStorage(loadedData); // Save to localStorage after loading
-            alert("Data loaded from file! You can now add more bulk fills.");
-          } else {
-            alert("Invalid file structure. Please upload a valid JSON file.");
-          }
+          // Merge loaded data with existing state
+          setTruckData((prev) => ({
+            ...prev,
+            ...loadedData.truckData,
+          }));
+          setBulkFills((prev) => [...prev, ...(loadedData.bulkFills || [])]);
+          setDiscrepancy(loadedData.discrepancy || null);
+          alert("Data loaded from file!");
         } catch (error) {
           alert("Error reading the file. Please upload a valid JSON file.");
           console.error("Error parsing file data:", error);
@@ -117,14 +72,6 @@ const App = () => {
 
     setBulkFills((prev) => [...prev, currentFill]);
     setCurrentFill({ time: "", amount: "" });
-
-    // Save updated bulk fills to local storage
-    const updatedData = {
-      truckData,
-      bulkFills: [...bulkFills, currentFill],
-      discrepancy,
-    };
-    saveToLocalStorage(updatedData);
     alert("Bulk fill saved successfully!");
   };
 
@@ -158,21 +105,7 @@ const App = () => {
       totalBulkFills,
       discrepancy: discrepancyValue,
     });
-
-    // Save discrepancy to local storage
-    const updatedData = {
-      truckData,
-      bulkFills,
-      discrepancy: {
-        meterFuelUsed,
-        dipDifference,
-        calculatedFuelUsed,
-        totalBulkFills,
-        discrepancy: discrepancyValue,
-      },
-    };
-    saveToLocalStorage(updatedData);
-    alert("Discrepancy calculated and saved!");
+    alert("Discrepancy calculated!");
   };
 
   // Reset All Data
@@ -188,7 +121,6 @@ const App = () => {
       setBulkFills([]);
       setDiscrepancy(null);
       setCurrentFill({ time: "", amount: "" });
-      localStorage.removeItem("fuelReceiptsData"); // Clear localStorage
       alert("All data has been reset!");
     }
   };
@@ -229,6 +161,9 @@ const App = () => {
           }
         />
       </label>
+      <button onClick={() => saveToFile("Start of Day")}>
+        Save Start of Day
+      </button>
 
       {/* Bulk Fill Section */}
       <h2>Bulk Fill</h2>
@@ -252,7 +187,8 @@ const App = () => {
           }
         />
       </label>
-      <button onClick={handleSaveBulkFill}>Save Bulk Fill</button>
+      <button onClick={handleSaveBulkFill}>Add Bulk Fill</button>
+      <button onClick={() => saveToFile("Bulk Fill")}>Save Bulk Fills</button>
 
       <h3>Saved Bulk Fills</h3>
       <ul>
@@ -285,9 +221,10 @@ const App = () => {
           }
         />
       </label>
-      <button onClick={calculateDiscrepancy}>Calculate Discrepancy</button>
+      <button onClick={() => saveToFile("End of Day")}>Save End of Day</button>
 
       {/* Discrepancy Results */}
+      <button onClick={calculateDiscrepancy}>Calculate Discrepancy</button>
       {discrepancy && (
         <div>
           <h3>Discrepancy Results</h3>
@@ -298,8 +235,7 @@ const App = () => {
             <strong>Dip Difference:</strong> {discrepancy.dipDifference} L
           </p>
           <p>
-            <strong>Calculated Fuel Used:</strong>{" "}
-            {discrepancy.calculatedFuelUsed} L
+            <strong>Calculated Fuel Used:</strong> {discrepancy.calculatedFuelUsed} L
           </p>
           <p>
             <strong>Total Bulk Fills:</strong> {discrepancy.totalBulkFills} L
@@ -312,7 +248,7 @@ const App = () => {
 
       {/* File Management Buttons */}
       <div>
-        <button onClick={saveToFile}>Save to File</button>
+        <button onClick={saveToFile}>Save All Data</button>
         <input
           type="file"
           accept=".json"
