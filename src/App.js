@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 
 const App = () => {
@@ -18,73 +18,137 @@ const App = () => {
 
   const [discrepancy, setDiscrepancy] = useState(null);
 
-  // Save Start Data
-  const handleSaveStartData = () => {
-    if (!truckData.truckId || !truckData.startMeter || !truckData.startDip) {
-      alert("Please fill out all fields for the start of day.");
-      return;
-    }
-    alert("Start data saved successfully!");
+  // Save data to localStorage
+  const saveToLocalStorage = (data) => {
+    localStorage.setItem("fuelReceiptsData", JSON.stringify(data));
+    alert("Data saved to local storage!");
   };
 
-  // Save End Data
-  const handleSaveEndData = () => {
-    if (!truckData.endMeter || !truckData.endDip) {
-      alert("Please fill out all fields for the end of day.");
-      return;
-    }
+  // Auto-load data from localStorage when the app starts
+  useEffect(() => {
+    const savedData = localStorage.getItem("fuelReceiptsData");
+    if (savedData) {
+      try {
+        const parsedData = JSON.parse(savedData);
 
-    if (parseFloat(truckData.endMeter) <= parseFloat(truckData.startMeter)) {
-      alert("End meter reading must be greater than start meter reading.");
-      return;
+        // Validate the structure of the saved data before loading
+        if (validateDataStructure(parsedData)) {
+          setTruckData(parsedData.truckData || {});
+          setBulkFills(parsedData.bulkFills || []);
+          setDiscrepancy(parsedData.discrepancy || null);
+          alert("Data loaded from local storage!");
+        } else {
+          console.warn("Invalid data structure in local storage. Ignoring.");
+        }
+      } catch (error) {
+        console.error("Error parsing local storage data:", error);
+      }
     }
+  }, []);
 
-    alert("End data saved successfully!");
+  // Validate the structure of the loaded file or local storage data
+  const validateDataStructure = (data) => {
+    if (
+      typeof data === "object" &&
+      data.truckData &&
+      Array.isArray(data.bulkFills)
+    ) {
+      return true;
+    }
+    return false;
   };
 
-  // Save Bulk Fill
+  // Save data to a local file
+  const saveToFile = () => {
+    const dataToSave = {
+      truckData,
+      bulkFills,
+      discrepancy,
+    };
+
+    saveToLocalStorage(dataToSave); // Save to localStorage
+
+    const fileData = new Blob([JSON.stringify(dataToSave, null, 2)], {
+      type: "application/json",
+    });
+
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(fileData);
+    link.download = "fuel_receipts_data.json";
+    link.click();
+    alert("Data saved to a local file!");
+  };
+
+  // Load data from a file
+  const loadFromFile = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const loadedData = JSON.parse(e.target.result);
+
+          // Validate the structure of the loaded file before updating state
+          if (validateDataStructure(loadedData)) {
+            setTruckData(loadedData.truckData || {});
+            setBulkFills(loadedData.bulkFills || []);
+            setDiscrepancy(loadedData.discrepancy || null);
+
+            saveToLocalStorage(loadedData); // Save to localStorage after loading
+            alert("Data loaded from file! You can now add more bulk fills.");
+          } else {
+            alert("Invalid file structure. Please upload a valid JSON file.");
+          }
+        } catch (error) {
+          alert("Error reading the file. Please upload a valid JSON file.");
+          console.error("Error parsing file data:", error);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  // Save a bulk fill
   const handleSaveBulkFill = () => {
     if (!currentFill.time || !currentFill.amount) {
       alert("Please fill out all fields for the bulk fill.");
       return;
     }
 
-    setBulkFills([...bulkFills, currentFill]);
+    setBulkFills((prev) => [...prev, currentFill]);
     setCurrentFill({ time: "", amount: "" });
+
+    // Save updated bulk fills to local storage
+    const updatedData = {
+      truckData,
+      bulkFills: [...bulkFills, currentFill],
+      discrepancy,
+    };
+    saveToLocalStorage(updatedData);
     alert("Bulk fill saved successfully!");
   };
 
-  // Calculate Discrepancy
+  // Calculate and reconcile the discrepancy
   const calculateDiscrepancy = () => {
-    if (
-      !truckData.startMeter ||
-      !truckData.endMeter ||
-      !truckData.startDip ||
-      !truckData.endDip ||
-      bulkFills.length === 0
-    ) {
+    const { startMeter, endMeter, startDip, endDip } = truckData;
+
+    if (!startMeter || !endMeter || !startDip || !endDip || bulkFills.length === 0) {
       alert("Please ensure all data is entered before calculating discrepancy.");
       return;
     }
 
-    // Meter Fuel Used
-    const meterFuelUsed =
-      parseFloat(truckData.endMeter) - parseFloat(truckData.startMeter);
-
-    // Dip Difference
-    const dipDifference =
-      parseFloat(truckData.startDip) - parseFloat(truckData.endDip);
-
-    // Calculated Fuel Used
+    // Calculate fuel usage
+    const meterFuelUsed = parseFloat(endMeter) - parseFloat(startMeter);
+    const dipDifference = parseFloat(startDip) - parseFloat(endDip);
     const calculatedFuelUsed = meterFuelUsed + dipDifference;
 
-    // Total Bulk Fills
+    // Calculate total bulk fills
     const totalBulkFills = bulkFills.reduce(
       (sum, fill) => sum + parseFloat(fill.amount || 0),
       0
     );
 
-    // Discrepancy
+    // Calculate discrepancy
     const discrepancyValue = calculatedFuelUsed - totalBulkFills;
 
     setDiscrepancy({
@@ -94,6 +158,21 @@ const App = () => {
       totalBulkFills,
       discrepancy: discrepancyValue,
     });
+
+    // Save discrepancy to local storage
+    const updatedData = {
+      truckData,
+      bulkFills,
+      discrepancy: {
+        meterFuelUsed,
+        dipDifference,
+        calculatedFuelUsed,
+        totalBulkFills,
+        discrepancy: discrepancyValue,
+      },
+    };
+    saveToLocalStorage(updatedData);
+    alert("Discrepancy calculated and saved!");
   };
 
   // Reset All Data
@@ -109,6 +188,7 @@ const App = () => {
       setBulkFills([]);
       setDiscrepancy(null);
       setCurrentFill({ time: "", amount: "" });
+      localStorage.removeItem("fuelReceiptsData"); // Clear localStorage
       alert("All data has been reset!");
     }
   };
@@ -149,7 +229,6 @@ const App = () => {
           }
         />
       </label>
-      <button onClick={handleSaveStartData}>Save Start Data</button>
 
       {/* Bulk Fill Section */}
       <h2>Bulk Fill</h2>
@@ -175,6 +254,15 @@ const App = () => {
       </label>
       <button onClick={handleSaveBulkFill}>Save Bulk Fill</button>
 
+      <h3>Saved Bulk Fills</h3>
+      <ul>
+        {bulkFills.map((fill, idx) => (
+          <li key={idx}>
+            Time: {fill.time}, Amount: {fill.amount} L
+          </li>
+        ))}
+      </ul>
+
       {/* End of Day Section */}
       <h2>End of Day</h2>
       <label>
@@ -197,14 +285,12 @@ const App = () => {
           }
         />
       </label>
-      <button onClick={handleSaveEndData}>Save End Data</button>
+      <button onClick={calculateDiscrepancy}>Calculate Discrepancy</button>
 
       {/* Discrepancy Results */}
-      <h2>Discrepancy Results</h2>
-      <button onClick={calculateDiscrepancy}>Calculate</button>
-
       {discrepancy && (
         <div>
+          <h3>Discrepancy Results</h3>
           <p>
             <strong>Meter Fuel Used:</strong> {discrepancy.meterFuelUsed} L
           </p>
@@ -224,24 +310,16 @@ const App = () => {
         </div>
       )}
 
-      {/* Stored Data */}
-      <h2>Stored Data</h2>
-      <h3>Truck Data</h3>
-      <p>
-        Truck ID: {truckData.truckId || "N/A"}, Start Meter:{" "}
-        {truckData.startMeter || "N/A"}, End Meter:{" "}
-        {truckData.endMeter || "N/A"}, Start Dip:{" "}
-        {truckData.startDip || "N/A"}, End Dip: {truckData.endDip || "N/A"}
-      </p>
-
-      <h3>Bulk Fills</h3>
-      <ul>
-        {bulkFills.map((fill, idx) => (
-          <li key={idx}>
-            Time: {fill.time}, Amount: {fill.amount} L
-          </li>
-        ))}
-      </ul>
+      {/* File Management Buttons */}
+      <div>
+        <button onClick={saveToFile}>Save to File</button>
+        <input
+          type="file"
+          accept=".json"
+          onChange={loadFromFile}
+          style={{ marginTop: "10px" }}
+        />
+      </div>
 
       {/* Reset Button */}
       <button className="reset-button" onClick={handleResetData}>
